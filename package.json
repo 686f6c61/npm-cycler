@@ -1,0 +1,33 @@
+{
+  "name": "npm-cycler",
+  "version": "0.1.0",
+  "description": "Herramienta CLI para automatizar ciclos de instalación/desinstalación de paquetes npm con soporte de proxies",
+  "main": "npm-cycler.js",
+  "bin": {
+    "npm-cycler": "./npm-cycler.js"
+  },
+  "scripts": {
+    "start": "node npm-cycler.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/686f6c61/npm-cycler.git"
+  },
+  "keywords": [
+    "npm",
+    "automation",
+    "install",
+    "cycler",
+    "proxy",
+    "cli"
+  ],
+  "author": "686f6c61 (https://github.com/686f6c61)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/686f6c61/npm-cycler/issues"
+  },
+  "homepage": "https://github.com/686f6c61/npm-cycler#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
