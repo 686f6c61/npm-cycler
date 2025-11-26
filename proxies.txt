@@ -1,0 +1,64 @@
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                              NPM-CYCLER                                   ║
+# ║                    Archivo de configuración de proxies                    ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║  Autor:       686f6c61                                                    ║
+# ║  GitHub:      https://github.com/686f6c61                                 ║
+# ║  Repositorio: https://github.com/686f6c61/npm-cycler                      ║
+# ║  Versión:     1.1.0                                                       ║
+# ║  Fecha:       26/11/2025                                                  ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║  Descripción:                                                             ║
+# ║  Lista de proxies para rotación automática. Cada línea representa un      ║
+# ║  proxy diferente. Las líneas vacías y comentarios (#) son ignorados.      ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+#
+# =============================================================================
+# FORMATOS SOPORTADOS
+# =============================================================================
+#
+# HTTP/HTTPS (los más comunes):
+#   http://ip:puerto
+#   http://usuario:password@ip:puerto
+#   https://ip:puerto
+#
+# SOCKS4/SOCKS5 (más anónimos):
+#   socks4://ip:puerto
+#   socks5://ip:puerto
+#   socks5://usuario:password@ip:puerto
+#
+# =============================================================================
+# EJEMPLOS
+# =============================================================================
+#
+# Proxy HTTP público:
+# http://103.152.112.162:80
+#
+# Proxy con autenticación:
+# http://usuario:clave@proxy.ejemplo.com:8080
+#
+# Proxy SOCKS5 (Tor por ejemplo):
+# socks5://127.0.0.1:9050
+#
+# Proxy residencial (de pago):
+# http://user-zone-residential:pass@proxy.provider.com:7777
+#
+# =============================================================================
+# FUENTES DE PROXIES
+# =============================================================================
+#
+# Gratuitos (poco fiables, úsalos solo para pruebas):
+#   - free-proxy-list.net
+#   - spys.one/en/
+#   - geonode.com/free-proxy-list
+#
+# De pago (más fiables y rápidos):
+#   - Bright Data (brightdata.com)
+#   - Oxylabs (oxylabs.io)
+#   - Smartproxy (smartproxy.com)
+#   - ProxyMesh (proxymesh.com)
+#
+# =============================================================================
+# TUS PROXIES (añade uno por línea debajo)
+# =============================================================================
+
