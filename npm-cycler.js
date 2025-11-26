@@ -8,7 +8,7 @@
  * ║  Autor:       686f6c61                                                    ║
  * ║  GitHub:      https://github.com/686f6c61                                 ║
  * ║  Repositorio: https://github.com/686f6c61/npm-cycler                      ║
- * ║  Versión:     1.1.0                                                       ║
+ * ║  Versión:     0.2.0                                                       ║
  * ║  Fecha:       26/11/2025                                                  ║
  * ║  Licencia:    MIT                                                         ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
@@ -30,7 +30,8 @@
  * ║  $ ./run.sh                                                               ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  Historial de versiones:                                                  ║
- * ║  v0.1.0 - 26/11/2025 - Versión inicial: ciclos, proxies, parseo flexible  ║
+ * ║  v0.1.0 - 26/11/2025 - Versión inicial: ciclos, proxies, parseo flexible ║
+ * ║  v0.2.0 - 26/11/2025 - Test de proxies en paralelo                       ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
@@ -469,7 +470,7 @@ async function main() {
   // BANNER INICIAL
   // =========================================================================
   console.log('\n╔════════════════════════════════════════╗');
-  console.log('║          NPM-CYCLER v0.1               ║');
+  console.log('║          NPM-CYCLER v0.2               ║');
   console.log('║    Automatizador de Instalaciones      ║');
   console.log('║    github.com/686f6c61/npm-cycler      ║');
   console.log('╚════════════════════════════════════════╝\n');

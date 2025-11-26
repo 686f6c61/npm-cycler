@@ -1,6 +1,6 @@
 {
   "name": "npm-cycler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Herramienta CLI para automatizar ciclos de instalación/desinstalación de paquetes npm con soporte de proxies",
   "main": "npm-cycler.js",
   "bin": {
