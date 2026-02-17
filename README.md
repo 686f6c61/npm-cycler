@@ -76,7 +76,7 @@ O cuando inicias el script, te preguntara si quieres testear los proxies primero
 ```
 $ ./run.sh
 
-NPM-CYCLER v0.2
+NPM-CYCLER v0.3
 github.com/686f6c61/npm-cycler
 
 Node.js v22.21.0 detectado
@@ -126,9 +126,10 @@ MIT License - ver el archivo del repositorio para mas detalles.
 
 ## VERSION
 
-v0.2.0 - 26/11/2025
+v0.3.0 - 17/02/2026
 
 ### CHANGELOG
 
+- v0.3.0: Endurecimiento de seguridad (sin shell en comandos npm), validaciones de entrada y test automatizados
 - v0.2.0: Test de proxies en paralelo, pregunta interactiva para testear
 - v0.1.0: Version inicial con ciclos y rotacion de proxies

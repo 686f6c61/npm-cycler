@@ -7,8 +7,8 @@
 # ║  Autor:       686f6c61                                                    ║
 # ║  GitHub:      https://github.com/686f6c61                                 ║
 # ║  Repositorio: https://github.com/686f6c61/npm-cycler                      ║
-# ║  Versión:     0.2.0                                                       ║
-# ║  Fecha:       26/11/2025                                                  ║
+# ║  Versión:     0.3.0                                                       ║
+# ║  Fecha:       17/02/2026                                                  ║
 # ║  Licencia:    MIT                                                         ║
 # ╠═══════════════════════════════════════════════════════════════════════════╣
 # ║  Descripción:                                                             ║
@@ -21,8 +21,9 @@
 # ║  $ ./run.sh --test-proxies  # Testear y filtrar proxies funcionales       ║
 # ╠═══════════════════════════════════════════════════════════════════════════╣
 # ║  Historial de versiones:                                                  ║
-# ║  v0.1.0 - 26/11/2025 - Versión inicial                                   ║
-# ║  v0.2.0 - 26/11/2025 - Test de proxies en paralelo                       ║
+# ║  v0.1.0 - 26/11/2025 - Versión inicial                                    ║
+# ║  v0.2.0 - 26/11/2025 - Test de proxies en paralelo                        ║
+# ║  v0.3.0 - 17/02/2026 - Seguridad, validaciones y test automatizados       ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 # =============================================================================
@@ -33,6 +34,35 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROXIES_FILE="$SCRIPT_DIR/proxies.txt"
 PROXIES_WORKING="$SCRIPT_DIR/proxies_working.txt"
 TEMP_DIR="$SCRIPT_DIR/.proxy_test_tmp"
+
+# =============================================================================
+# FUNCIONES AUXILIARES DE PROXIES
+# =============================================================================
+
+# Devuelve únicamente proxies válidos y soportados (http/https/socks4/socks5)
+filter_valid_proxies() {
+    local input_file="$1"
+    awk '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+            print
+        }
+    ' "$input_file" | grep -E '^(https?|socks4|socks5)://'
+}
+
+# Cuenta proxies válidos en PROXIES_FILE
+count_valid_proxies() {
+    if [ ! -f "$PROXIES_FILE" ]; then
+        echo "0"
+        return
+    fi
+
+    local count
+    count=$(filter_valid_proxies "$PROXIES_FILE" | wc -l)
+    echo "${count//[[:space:]]/}"
+}
 
 # =============================================================================
 # FUNCION: TEST DE UN PROXY INDIVIDUAL
@@ -89,12 +119,18 @@ test_proxies_parallel() {
         exit 1
     fi
 
-    # Extraer solo las lineas de proxies (ignorar comentarios y vacias)
-    local proxies=$(grep -v '^#' "$PROXIES_FILE" | grep -v '^$' | grep -E '^https?://')
-    local total=$(echo "$proxies" | wc -l)
+    # Cargar proxies válidos en array (evita falsos positivos por líneas vacías)
+    local proxies=()
+    while IFS= read -r proxy; do
+        if [ -n "$proxy" ]; then
+            proxies+=("$proxy")
+        fi
+    done < <(filter_valid_proxies "$PROXIES_FILE")
+    local total=${#proxies[@]}
 
     if [ "$total" -eq 0 ]; then
-        echo "❌ No hay proxies en proxies.txt"
+        echo "❌ No hay proxies válidos en proxies.txt"
+        echo "   Formatos soportados: http://, https://, socks4://, socks5://"
         exit 1
     fi
 
@@ -117,7 +153,7 @@ test_proxies_parallel() {
     local pids=()
 
     # Procesar proxies en lotes de 10
-    while IFS= read -r proxy; do
+    for proxy in "${proxies[@]}"; do
         # Lanzar test en background
         test_single_proxy "$proxy" "$temp_working" &
         pids+=($!)
@@ -129,7 +165,7 @@ test_proxies_parallel() {
             pids=()
         fi
 
-    done <<< "$proxies"
+    done
 
     # Esperar a los ultimos procesos
     if [ ${#pids[@]} -gt 0 ]; then
@@ -187,7 +223,7 @@ show_main_menu() {
     clear
 
     echo "╔════════════════════════════════════════╗"
-    echo "║            NPM-CYCLER v0.2             ║"
+    echo "║            NPM-CYCLER v0.3             ║"
     echo "║    github.com/686f6c61/npm-cycler      ║"
     echo "╚════════════════════════════════════════╝"
     echo ""
@@ -210,23 +246,24 @@ show_main_menu() {
 
     # Verificar proxies
     if [ -f "$PROXIES_FILE" ]; then
-        PROXY_COUNT=$(grep -v '^#' "$PROXIES_FILE" | grep -v '^$' | wc -l)
+        PROXY_COUNT=$(count_valid_proxies)
         if [ "$PROXY_COUNT" -gt 0 ]; then
             echo "✅ $PROXY_COUNT proxies disponibles en proxies.txt"
 
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-            read -p "🔍 ¿Testear proxies antes de continuar? (s/n): " test_answer
+            read -r -p "🔍 ¿Testear proxies antes de continuar? (s/n): " test_answer
+            test_answer=$(printf '%s' "$test_answer" | tr '[:upper:]' '[:lower:]')
 
-            if [ "$test_answer" = "s" ] || [ "$test_answer" = "S" ] || [ "$test_answer" = "si" ]; then
+            if [ "$test_answer" = "s" ] || [ "$test_answer" = "si" ]; then
                 test_proxies_parallel
                 echo ""
                 echo "Presiona ENTER para continuar..."
                 read
                 clear
                 echo "╔════════════════════════════════════════╗"
-                echo "║            NPM-CYCLER v0.2             ║"
+                echo "║            NPM-CYCLER v0.3             ║"
                 echo "║    github.com/686f6c61/npm-cycler      ║"
                 echo "╚════════════════════════════════════════╝"
                 echo ""
@@ -234,7 +271,7 @@ show_main_menu() {
                 echo "✅ npm $(npm -v) detectado"
 
                 # Recontar proxies despues del test
-                PROXY_COUNT=$(grep -v '^#' "$PROXIES_FILE" | grep -v '^$' | wc -l)
+                PROXY_COUNT=$(count_valid_proxies)
                 if [ "$PROXY_COUNT" -gt 0 ]; then
                     echo "✅ $PROXY_COUNT proxies funcionales en proxies.txt"
                 else
@@ -242,7 +279,7 @@ show_main_menu() {
                 fi
             fi
         else
-            echo "⚠️  proxies.txt existe pero esta vacio"
+            echo "⚠️  proxies.txt no tiene proxies validos"
         fi
     else
         echo "⚠️  proxies.txt no encontrado"

@@ -8,8 +8,8 @@
  * ║  Autor:       686f6c61                                                    ║
  * ║  GitHub:      https://github.com/686f6c61                                 ║
  * ║  Repositorio: https://github.com/686f6c61/npm-cycler                      ║
- * ║  Versión:     0.2.0                                                       ║
- * ║  Fecha:       26/11/2025                                                  ║
+ * ║  Versión:     0.3.0                                                       ║
+ * ║  Fecha:       17/02/2026                                                  ║
  * ║  Licencia:    MIT                                                         ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  Descripción:                                                             ║
@@ -32,6 +32,7 @@
  * ║  Historial de versiones:                                                  ║
  * ║  v0.1.0 - 26/11/2025 - Versión inicial: ciclos, proxies, parseo flexible ║
  * ║  v0.2.0 - 26/11/2025 - Test de proxies en paralelo                       ║
+ * ║  v0.3.0 - 17/02/2026 - Seguridad, validaciones y test automatizados      ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
@@ -44,7 +45,7 @@
  * Permite ejecutar comandos del sistema operativo (npm install/uninstall)
  * @see https://nodejs.org/api/child_process.html
  */
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 /**
  * Módulo readline de Node.js
@@ -67,18 +68,47 @@ const fs = require('fs');
  */
 const path = require('path');
 
+/**
+ * Binario npm según plataforma
+ * En Windows se invoca npm.cmd, en Unix npm
+ */
+const NPM_BINARY = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+/**
+ * Expresión regular básica para package specs válidos
+ * Soporta:
+ * - lodash
+ * - @scope/pkg
+ * - lodash@1.2.3 / lodash@latest / @scope/pkg@^1.0.0
+ */
+const PACKAGE_SPEC_REGEX = /^(?:@[\w.-]+\/)?[\w.-]+(?:@[^\s]+)?$/;
+
 // =============================================================================
 // CONFIGURACIÓN DE READLINE
 // =============================================================================
 
 /**
- * Interfaz de readline para interacción con el usuario
- * Configura stdin como entrada y stdout como salida
+ * Interfaz de readline para interacción con el usuario.
+ * Se inicializa en demanda para evitar handles abiertos al importar el módulo.
  */
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+let rl = null;
+
+function getReadline() {
+  if (!rl) {
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+  }
+  return rl;
+}
+
+function closeReadline() {
+  if (rl) {
+    rl.close();
+    rl = null;
+  }
+}
 
 // =============================================================================
 // FUNCIONES UTILITARIAS
@@ -96,7 +126,7 @@ const rl = readline.createInterface({
  */
 function question(prompt) {
   return new Promise((resolve) => {
-    rl.question(prompt, resolve);
+    getReadline().question(prompt, resolve);
   });
 }
 
@@ -112,6 +142,74 @@ function question(prompt) {
  */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Ejecuta npm sin pasar por un shell para evitar inyección de comandos
+ *
+ * @param {string[]} args - Argumentos para npm
+ * @param {Object} options - Opciones de spawnSync
+ * @returns {Object} - Resultado de spawnSync
+ * @throws {Error} - Si npm falla o termina con código != 0
+ */
+function runNpmCommand(args, options = {}) {
+  const result = spawnSync(NPM_BINARY, args, {
+    ...options,
+    encoding: 'utf-8'
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    const stderr = (result.stderr || '').trim();
+    const stdout = (result.stdout || '').trim();
+    const reason = result.status === null
+      ? `proceso terminado por señal (${result.signal || 'desconocida'})`
+      : `código de salida ${result.status}`;
+    const details = stderr || stdout || reason;
+    throw new Error(details);
+  }
+
+  return result;
+}
+
+/**
+ * Construye un env para npm opcionalmente aplicando variables de proxy
+ *
+ * @param {string|null} proxy - URL de proxy
+ * @returns {Object} - Variables de entorno
+ */
+function buildEnvWithProxy(proxy = null) {
+  const env = { ...process.env };
+
+  if (!proxy) {
+    return env;
+  }
+
+  if (proxy.startsWith('socks://') || proxy.startsWith('socks5://') || proxy.startsWith('socks4://')) {
+    env.ALL_PROXY = proxy;
+  } else {
+    env.HTTP_PROXY = proxy;
+    env.HTTPS_PROXY = proxy;
+  }
+
+  return env;
+}
+
+/**
+ * Parsea un entero de forma estricta (solo dígitos)
+ *
+ * @param {string} value - Valor de entrada
+ * @returns {number} - Entero parseado o NaN
+ */
+function parseStrictInteger(value) {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return NaN;
+  }
+  return Number.parseInt(trimmed, 10);
 }
 
 /**
@@ -191,20 +289,11 @@ function loadProxies(filePath) {
  */
 function testProxy(proxy) {
   try {
-    // Clonar variables de entorno actuales
-    const env = { ...process.env };
-
-    // Configurar variables de proxy según el tipo
-    // SOCKS requiere ALL_PROXY, HTTP/HTTPS usan sus respectivas variables
-    if (proxy.startsWith('socks://') || proxy.startsWith('socks5://') || proxy.startsWith('socks4://')) {
-      env.ALL_PROXY = proxy;
-    } else {
-      env.HTTP_PROXY = proxy;
-      env.HTTPS_PROXY = proxy;
-    }
+    // Preparar variables de entorno con proxy
+    const env = buildEnvWithProxy(proxy);
 
     // Ejecutar npm ping con timeout de 15 segundos
-    execSync('npm ping', {
+    runNpmCommand(['ping'], {
       env,
       stdio: 'pipe',      // Capturar output sin mostrarlo
       timeout: 15000      // 15 segundos máximo
@@ -337,21 +426,11 @@ async function installPackage(packageName, tempDir, proxy = null) {
   try {
     console.log(`  📦 Instalando ${packageName}...`);
 
-    // Preparar variables de entorno
-    const env = { ...process.env };
+    // Preparar variables de entorno (incluye proxy si aplica)
+    const env = buildEnvWithProxy(proxy);
 
-    // Configurar proxy si se especificó
-    if (proxy) {
-      if (proxy.startsWith('socks://') || proxy.startsWith('socks5://') || proxy.startsWith('socks4://')) {
-        env.ALL_PROXY = proxy;
-      } else {
-        env.HTTP_PROXY = proxy;
-        env.HTTPS_PROXY = proxy;
-      }
-    }
-
-    // Ejecutar npm install
-    execSync(`npm install ${packageName}`, {
+    // Ejecutar npm install de forma segura sin shell
+    runNpmCommand(['install', packageName], {
       cwd: tempDir,       // Directorio de trabajo
       env,                // Variables de entorno (incluye proxy)
       stdio: 'pipe',      // Capturar output
@@ -382,21 +461,11 @@ async function uninstallPackage(packageName, tempDir, proxy = null) {
   try {
     console.log(`  🗑️  Desinstalando ${packageName}...`);
 
-    // Preparar variables de entorno
-    const env = { ...process.env };
+    // Preparar variables de entorno (incluye proxy si aplica)
+    const env = buildEnvWithProxy(proxy);
 
-    // Configurar proxy si se especificó
-    if (proxy) {
-      if (proxy.startsWith('socks://') || proxy.startsWith('socks5://') || proxy.startsWith('socks4://')) {
-        env.ALL_PROXY = proxy;
-      } else {
-        env.HTTP_PROXY = proxy;
-        env.HTTPS_PROXY = proxy;
-      }
-    }
-
-    // Ejecutar npm uninstall
-    execSync(`npm uninstall ${packageName}`, {
+    // Ejecutar npm uninstall de forma segura sin shell
+    runNpmCommand(['uninstall', packageName], {
       cwd: tempDir,       // Directorio de trabajo
       env,                // Variables de entorno
       stdio: 'pipe',      // Capturar output
@@ -450,6 +519,25 @@ function parsePackageName(input) {
   return cleaned.trim();
 }
 
+/**
+ * Valida formato básico del package spec para evitar entradas inválidas
+ *
+ * @param {string} packageSpec - Package spec limpio
+ * @returns {boolean}
+ */
+function isValidPackageSpec(packageSpec) {
+  if (!packageSpec) {
+    return false;
+  }
+
+  // Bloquear metacaracteres de shell y espacios
+  if (/[;&|`$<>\\\s]/.test(packageSpec)) {
+    return false;
+  }
+
+  return PACKAGE_SPEC_REGEX.test(packageSpec);
+}
+
 // =============================================================================
 // FUNCIÓN PRINCIPAL
 // =============================================================================
@@ -470,7 +558,7 @@ async function main() {
   // BANNER INICIAL
   // =========================================================================
   console.log('\n╔════════════════════════════════════════╗');
-  console.log('║          NPM-CYCLER v0.2               ║');
+  console.log('║          NPM-CYCLER v0.3               ║');
   console.log('║    Automatizador de Instalaciones      ║');
   console.log('║    github.com/686f6c61/npm-cycler      ║');
   console.log('╚════════════════════════════════════════╝\n');
@@ -507,23 +595,41 @@ async function main() {
   // Validar que se ingresó un paquete
   if (!packageName.trim()) {
     console.log('❌ Debes especificar un nombre de paquete');
-    rl.close();
+    closeReadline();
+    return;
+  }
+
+  // Validar formato básico del package spec
+  if (!isValidPackageSpec(packageName)) {
+    console.log('❌ Formato de paquete inválido');
+    console.log('   Ejemplos válidos: lodash, @scope/pkg, lodash@latest');
+    closeReadline();
     return;
   }
 
   // Solicitar número de iteraciones
-  const iterations = parseInt(await question('🔢 Número de iteraciones: '), 10);
+  const iterations = parseStrictInteger(await question('🔢 Número de iteraciones: '));
 
   // Validar iteraciones
-  if (isNaN(iterations) || iterations < 1) {
+  if (!Number.isInteger(iterations) || iterations < 1) {
     console.log('❌ Número de iteraciones inválido');
-    rl.close();
+    closeReadline();
     return;
   }
 
   // Solicitar delays (con valores por defecto)
-  const minDelay = parseInt(await question('⏱️  Delay mínimo entre iteraciones (segundos): '), 10) || 1;
-  const maxDelay = parseInt(await question('⏱️  Delay máximo entre iteraciones (segundos): '), 10) || 5;
+  const minDelayInput = await question('⏱️  Delay mínimo entre iteraciones (segundos): ');
+  const maxDelayInput = await question('⏱️  Delay máximo entre iteraciones (segundos): ');
+
+  const minDelay = minDelayInput.trim() === '' ? 1 : parseStrictInteger(minDelayInput);
+  const maxDelay = maxDelayInput.trim() === '' ? 5 : parseStrictInteger(maxDelayInput);
+
+  if (!Number.isInteger(minDelay) || !Number.isInteger(maxDelay) || maxDelay < minDelay) {
+    console.log('❌ Configuración de delays inválida');
+    console.log('   Reglas: números enteros >= 0 y máximo >= mínimo');
+    closeReadline();
+    return;
+  }
 
   // Preguntar si usar proxies (solo si hay disponibles)
   let useProxies = false;
@@ -533,7 +639,7 @@ async function main() {
   }
 
   // Cerrar readline (no necesitamos más input)
-  rl.close();
+  closeReadline();
 
   // =========================================================================
   // RESUMEN DE CONFIGURACIÓN
@@ -601,8 +707,12 @@ async function main() {
 
       if (installed) {
         // Si la instalación fue exitosa, desinstalar
-        await uninstallPackage(packageName, tempDir, currentProxy);
-        successful++;
+        const uninstalled = await uninstallPackage(packageName, tempDir, currentProxy);
+        if (uninstalled) {
+          successful++;
+        } else {
+          failed++;
+        }
       } else {
         failed++;
       }
@@ -639,6 +749,18 @@ async function main() {
   console.log('╚════════════════════════════════════════╝\n');
 }
 
+module.exports = {
+  parsePackageName,
+  isValidPackageSpec,
+  parseStrictInteger,
+  getRandomDelay,
+  loadProxies,
+  buildEnvWithProxy,
+  createTempDir,
+  removeTempDir,
+  runNpmCommand
+};
+
 // =============================================================================
 // PUNTO DE ENTRADA
 // =============================================================================
@@ -647,4 +769,10 @@ async function main() {
  * Ejecutar la función principal
  * Capturar y mostrar errores no manejados
  */
-main().catch(console.error);
+if (require.main === module) {
+  main().catch((error) => {
+    closeReadline();
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
